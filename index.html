@@ -459,18 +459,62 @@ let activeCategory = "All";
 let activeStatus = "All";
 
 /* ---------- Google Sheet loading ---------- */
+// Each field accepts a few possible header spellings, so renaming a column
+// in the sheet (e.g. "Notes" -> "Description") keeps working without any
+// code changes. Add more variants here any time you rename a column.
+const FIELD_HEADER_ALIASES = {
+  id:       ["item id", "id"],
+  category: ["category"],
+  name:     ["item name", "name"],
+  photo:    ["photo", "photo link", "image"],
+  size:     ["size"],
+  color:    ["color", "colour"],
+  era:      ["era"],
+  location: ["location"],
+  notes:    ["notes", "description"],
+  status:   ["status"]
+};
+
 async function loadFromSheet(){
   const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(CONFIG.SHEET_NAME)}`;
   const res = await fetch(url);
   const text = await res.text();
   const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
-  const rows = json.table.rows.slice(1); // row 0 is the header row itself ("Item ID", "Category", ...)
-  return rows.map(r => {
+  const rows = json.table.rows;
+  if(rows.length === 0) return [];
+
+  // Row 0 holds your actual header text (Google doesn't treat it specially here)
+  const headerCells = rows[0].c.map(cell => (cell && cell.v !== null && cell.v !== undefined) ? String(cell.v).trim().toLowerCase() : "");
+
+  // Build field -> column index by matching each field's accepted header names
+  const colIndex = {};
+  Object.keys(FIELD_HEADER_ALIASES).forEach(field => {
+    const aliases = FIELD_HEADER_ALIASES[field];
+    const idx = headerCells.findIndex(h => aliases.includes(h));
+    colIndex[field] = idx; // -1 if that column doesn't exist in the sheet right now
+  });
+
+  const dataRows = rows.slice(1);
+  const claimedIndices = new Set(Object.values(colIndex).filter(i => i >= 0));
+  const extraColumns = headerCells
+    .map((h, i) => ({header: h, index: i}))
+    .filter(c => c.header && !claimedIndices.has(c.index));
+  // preserve original casing for display labels (headerCells above is lowercased for matching)
+  const originalHeaderCells = rows[0].c.map(cell => (cell && cell.v !== null && cell.v !== undefined) ? String(cell.v).trim() : "");
+
+  return dataRows.map(r => {
     const c = r.c;
-    const v = i => (c[i] && c[i].v !== null && c[i].v !== undefined) ? String(c[i].v).trim() : "";
+    const v = i => (i >= 0 && c[i] && c[i].v !== null && c[i].v !== undefined) ? String(c[i].v).trim() : "";
+    const extra = {};
+    extraColumns.forEach(col => {
+      const val = v(col.index);
+      if(val) extra[originalHeaderCells[col.index]] = val;
+    });
     return {
-      id: v(0), category: v(1), name: v(2), photo: v(3), size: v(4),
-      color: v(5), era: v(6), location: v(7), notes: v(8), status: v(9) || "Available"
+      id: v(colIndex.id), category: v(colIndex.category), name: v(colIndex.name),
+      photo: v(colIndex.photo), size: v(colIndex.size), color: v(colIndex.color),
+      era: v(colIndex.era), location: v(colIndex.location), notes: v(colIndex.notes),
+      status: v(colIndex.status) || "Available", extra
     };
   }).filter(item => item.id);
 }
@@ -543,7 +587,8 @@ function buildFilters(){
 
 function matchesSearch(item, q){
   if(!q) return true;
-  const hay = [item.name, item.category, item.color, item.era, item.notes, item.location, item.id].join(' ').toLowerCase();
+  const extraVals = Object.values(item.extra || {});
+  const hay = [item.name, item.category, item.color, item.era, item.notes, item.location, item.id, ...extraVals].join(' ').toLowerCase();
   return hay.includes(q);
 }
 
@@ -603,6 +648,32 @@ function escapeHtml(str){
 }
 
 /* ---------- Modal ---------- */
+const MODAL_FIELD_DEFS = [
+  {key:'id', label:'Item ID'},
+  {key:'status', label:'Status'},
+  {key:'size', label:'Size'},
+  {key:'color', label:'Colour'},
+  {key:'era', label:'Era'},
+  {key:'location', label:'Location'}
+];
+
+function buildModalFields(item){
+  const knownFields = MODAL_FIELD_DEFS
+    .filter(f => f.key === 'id' || f.key === 'status' || fieldHasAnyData(f.key))
+    .map(f => `<div class="modal-field"><label>${escapeHtml(f.label)}</label><div>${escapeHtml(item[f.key] || '—')}</div></div>`)
+    .join('');
+
+  const extraFields = Object.keys(item.extra || {})
+    .map(label => `<div class="modal-field"><label>${escapeHtml(label)}</label><div>${escapeHtml(item.extra[label])}</div></div>`)
+    .join('');
+
+  return knownFields + extraFields;
+}
+
+function fieldHasAnyData(key){
+  return ALL_ITEMS.some(it => it[key]);
+}
+
 function openModal(item){
   const backdrop = document.getElementById('modalBackdrop');
   const driveId = extractDriveId(item.photo);
@@ -626,12 +697,7 @@ function openModal(item){
     <div class="modal-cat">${escapeHtml(item.category || '—')}</div>
     <div class="modal-name">${escapeHtml(item.name || 'Untitled item')}</div>
     <div class="modal-grid">
-      <div class="modal-field"><label>Item ID</label><div>${escapeHtml(item.id)}</div></div>
-      <div class="modal-field"><label>Status</label><div>${escapeHtml(item.status || '—')}</div></div>
-      <div class="modal-field"><label>Size</label><div>${escapeHtml(item.size || '—')}</div></div>
-      <div class="modal-field"><label>Colour</label><div>${escapeHtml(item.color || '—')}</div></div>
-      <div class="modal-field"><label>Era</label><div>${escapeHtml(item.era || '—')}</div></div>
-      <div class="modal-field"><label>Location</label><div>${escapeHtml(item.location || '—')}</div></div>
+      ${buildModalFields(item)}
     </div>
     ${item.notes ? `<div class="modal-notes">${escapeHtml(item.notes)}</div>` : ''}
     ${fullLink}
