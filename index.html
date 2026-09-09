@@ -19,7 +19,9 @@
     // The exact name of the tab, as shown at the bottom of the sheet
     SHEET_NAME: "Wardrobe Catalogue",
     // Where order request emails should be sent (opens the visitor's own email app)
-    CONTACT_EMAIL: "garthcoulson@gmail.com"
+    CONTACT_EMAIL: "testthis@gmail.com",
+    // Shown in the footer and as a fallback if a visitor's email app doesn't open
+    CONTACT_PHONE: "021 877 9869"
   };
 </script>
 <style>
@@ -522,6 +524,19 @@
     color:var(--ink);
     margin:0 0 1.3rem;
   }
+  .order-confirm-fallback{
+    text-align:center;
+    font-size:.82rem;
+    color:var(--curtain-dark);
+    margin-top:1rem;
+    padding-top:1rem;
+    border-top:1px solid rgba(42,36,32,.1);
+  }
+  .order-confirm-fallback a{
+    color:var(--curtain);
+    text-decoration:underline;
+    text-underline-offset:2px;
+  }
   .order-send-btn{
     width:100%;
     margin-top:1.3rem;
@@ -557,6 +572,15 @@
     color:var(--curtain-dark);
     opacity:.55;
     font-family:'Space Mono', monospace;
+  }
+  footer .footer-contact{
+    margin-top:.5rem;
+    opacity:1;
+  }
+  footer .footer-contact a{
+    color:var(--curtain-dark);
+    text-decoration:underline;
+    text-underline-offset:2px;
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -598,7 +622,10 @@
   </div>
 </main>
 
-<footer>Wardrobe Catalogue — built for the company, kept in Google Sheets</footer>
+<footer>
+  Wardrobe Catalogue — built for the company, kept in Google Sheets
+  <div class="footer-contact" id="footerContact"></div>
+</footer>
 
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal">
@@ -637,6 +664,7 @@
       <p class="order-confirm-text">Your email app should have opened with your order ready to send. Once you've sent it, you can clear this list.</p>
       <button class="order-send-btn" id="orderSentBtn">✓ Order sent — clear my list</button>
       <button class="order-clear-link" id="orderKeepEditingBtn">It didn't open — go back</button>
+      <p class="order-confirm-fallback" id="orderConfirmFallback"></p>
     </div>
   </div>
 </div>
@@ -842,6 +870,25 @@ function render(){
 
 /* ---------- Order (email request) ---------- */
 let ORDER_ITEMS = {};
+
+function telHref(phone){
+  return 'tel:' + String(phone || '').replace(/[^0-9+]/g, '');
+}
+
+function renderContactDetails(){
+  const email = CONFIG.CONTACT_EMAIL;
+  const phone = CONFIG.CONTACT_PHONE;
+  const parts = [];
+  if(email) parts.push(`<a href="mailto:${email}">${escapeHtml(email)}</a>`);
+  if(phone) parts.push(`<a href="${telHref(phone)}">${escapeHtml(phone)}</a>`);
+  const line = parts.join(' · ');
+
+  const footerEl = document.getElementById('footerContact');
+  if(footerEl) footerEl.innerHTML = line ? `Questions? ${line}` : '';
+
+  const fallbackEl = document.getElementById('orderConfirmFallback');
+  if(fallbackEl) fallbackEl.innerHTML = line ? `Or contact us directly: ${line}` : '';
+}
 
 function loadOrder(){
   try{
@@ -1065,6 +1112,7 @@ document.getElementById('searchInput').addEventListener('input', render);
 async function boot(){
   loadOrder();
   updateOrderFab();
+  renderContactDetails();
   if(CONFIG.SHEET_ID){
     try{
       ALL_ITEMS = await loadFromSheet();
