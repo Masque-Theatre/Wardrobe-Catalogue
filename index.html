@@ -17,7 +17,9 @@
     // Paste the long ID from your Google Sheet's URL between /d/ and /edit
     SHEET_ID: "1CJTmjwjVbtbnG9Nfj_7yaGJd0vVcBtWcGs3gsb117aI",
     // The exact name of the tab, as shown at the bottom of the sheet
-    SHEET_NAME: "Wardrobe Catalogue"
+    SHEET_NAME: "Wardrobe Catalogue",
+    // Where order request emails should be sent (opens the visitor's own email app)
+    CONTACT_EMAIL: "wardrobe@yourtheatre.org"
   };
 </script>
 <style>
@@ -129,22 +131,22 @@
     margin-top:1rem;
     align-items:center;
   }
-  .chip{
+  .category-select{
     font-family:'Space Mono', monospace;
-    font-size:.72rem;
-    letter-spacing:.04em;
-    text-transform:uppercase;
-    padding:.42rem .85rem;
+    font-size:.78rem;
+    letter-spacing:.03em;
+    padding:.5rem 2rem .5rem .9rem;
     border-radius:999px;
     border:1px solid var(--curtain);
-    background:transparent;
+    background:var(--paper)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%235C1A24'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E") no-repeat right .6rem center/1rem 1rem;
     color:var(--curtain);
     cursor:pointer;
-    transition:all .15s ease;
+    appearance:none;
+    -webkit-appearance:none;
+    max-width:100%;
   }
-  .chip:hover{background:rgba(92,26,36,.08);}
-  .chip.active{background:var(--curtain); color:var(--paper); border-color:var(--curtain);}
-  .filter-sep{width:1px; height:1.4rem; background:var(--curtain); opacity:.25; margin:0 .3rem;}
+  .category-select:hover{background-color:rgba(92,26,36,.08);}
   .count-readout{
     margin-left:auto;
     font-family:'Space Mono', monospace;
@@ -233,13 +235,6 @@
     margin-left:26px;
     padding:.85rem .95rem 1rem;
   }
-  .card-cat{
-    font-family:'Space Mono', monospace;
-    font-size:.65rem;
-    text-transform:uppercase;
-    letter-spacing:.1em;
-    color:var(--sage);
-  }
   .card-name{
     font-family:'Fraunces', serif;
     font-weight:600;
@@ -252,14 +247,15 @@
     margin-bottom:.55rem;
   }
   .pill{
-    font-size:.68rem;
-    padding:.15rem .5rem;
+    font-size:.85rem;
+    font-weight:600;
+    padding:.3rem .85rem;
     background:rgba(92,26,36,.08);
     border-radius:999px;
     color:var(--curtain-dark);
   }
   .card-foot{
-    display:flex; justify-content:space-between; align-items:center;
+    display:flex; justify-content:space-between; align-items:flex-end;
     margin-top:.4rem;
   }
   .stub-id{
@@ -267,6 +263,15 @@
     font-size:.72rem;
     color:var(--stub-red);
     letter-spacing:.03em;
+  }
+  .card-foot-right{
+    display:flex; flex-direction:column; align-items:flex-end; gap:.15rem;
+  }
+  .card-price{
+    font-family:'Space Mono', monospace;
+    font-size:.72rem;
+    font-weight:700;
+    color:var(--curtain-dark);
   }
   .status-dot{
     display:inline-flex; align-items:center; gap:.35rem;
@@ -338,8 +343,35 @@
     font-family:'Fraunces', serif;
     font-weight:700;
     font-size:1.8rem;
-    margin:.2rem 0 1rem;
+    margin:.2rem 0 .3rem;
   }
+  .modal-price{
+    font-family:'Space Mono', monospace;
+    font-size:.95rem;
+    font-weight:700;
+    color:var(--curtain-dark);
+    margin-bottom:1rem;
+  }
+  .order-toggle-btn{
+    display:inline-flex; align-items:center; gap:.5rem;
+    font-family:'Work Sans', sans-serif;
+    font-weight:600;
+    font-size:.9rem;
+    padding:.65rem 1.2rem;
+    border-radius:999px;
+    border:1px solid var(--curtain);
+    background:var(--curtain);
+    color:var(--paper);
+    cursor:pointer;
+    margin-bottom:1.2rem;
+    transition:all .15s ease;
+  }
+  .order-toggle-btn:hover{background:var(--curtain-dark);}
+  .order-toggle-btn.in-order{
+    background:var(--paper);
+    color:var(--curtain);
+  }
+  .order-toggle-btn.in-order:hover{background:rgba(92,26,36,.08);}
   .modal-grid{
     display:grid;
     grid-template-columns:repeat(2, 1fr);
@@ -375,6 +407,143 @@
     text-underline-offset:3px;
   }
 
+  /* ---------- Order drawer ---------- */
+  .order-fab{
+    position:fixed;
+    right:1.4rem; bottom:1.4rem;
+    z-index:60;
+    display:none;
+    align-items:center; gap:.5rem;
+    background:var(--curtain);
+    color:var(--paper);
+    border:none;
+    padding:.85rem 1.3rem;
+    border-radius:999px;
+    font-family:'Work Sans', sans-serif;
+    font-weight:600;
+    font-size:.95rem;
+    cursor:pointer;
+    box-shadow:0 10px 26px -8px rgba(0,0,0,.5);
+  }
+  .order-fab.visible{display:inline-flex;}
+  .order-fab .count-badge{
+    background:var(--gold);
+    color:var(--charcoal);
+    border-radius:999px;
+    min-width:1.5rem; height:1.5rem;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:.78rem; font-weight:700;
+    padding:0 .35rem;
+  }
+  .order-panel{
+    background:var(--paper);
+    max-width:520px; width:100%;
+    max-height:88vh;
+    overflow-y:auto;
+    border-radius:10px;
+    position:relative;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.5);
+    padding:1.6rem 1.8rem 2rem;
+  }
+  .order-panel h2{
+    font-family:'Fraunces', serif;
+    font-size:1.5rem;
+    margin:0 0 1rem;
+    padding-right:2rem;
+  }
+  .order-list{
+    list-style:none; margin:0 0 1rem; padding:0;
+    border-top:1px solid rgba(42,36,32,.1);
+  }
+  .order-list-item{
+    display:flex; justify-content:space-between; align-items:center;
+    gap:.8rem;
+    padding:.7rem 0;
+    border-bottom:1px solid rgba(42,36,32,.1);
+  }
+  .order-list-item .oli-info{flex:1; min-width:0;}
+  .order-list-item .oli-name{font-weight:600; font-size:.92rem;}
+  .order-list-item .oli-meta{
+    font-family:'Space Mono', monospace;
+    font-size:.72rem;
+    color:var(--curtain-dark);
+    opacity:.75;
+  }
+  .order-remove-btn{
+    background:transparent;
+    border:1px solid rgba(42,36,32,.25);
+    color:var(--curtain-dark);
+    width:26px; height:26px;
+    border-radius:50%;
+    cursor:pointer;
+    font-size:.85rem;
+    line-height:1;
+    flex-shrink:0;
+  }
+  .order-remove-btn:hover{background:rgba(92,26,36,.08);}
+  .order-empty{
+    text-align:center;
+    padding:2rem 1rem;
+    color:var(--curtain-dark);
+    opacity:.7;
+    font-size:.9rem;
+  }
+  .order-total{
+    text-align:right;
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:.9rem;
+    margin:.4rem 0 1.3rem;
+  }
+  .order-form label{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:.65rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--curtain);
+    opacity:.7;
+    margin:.9rem 0 .3rem;
+  }
+  .order-form input, .order-form textarea{
+    width:100%;
+    font-family:'Work Sans', sans-serif;
+    font-size:.92rem;
+    padding:.6rem .7rem;
+    border:1px solid rgba(42,36,32,.25);
+    border-radius:6px;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  .order-form textarea{resize:vertical; min-height:70px;}
+  .order-send-btn{
+    width:100%;
+    margin-top:1.3rem;
+    background:var(--curtain);
+    color:var(--paper);
+    border:none;
+    padding:.9rem;
+    border-radius:8px;
+    font-family:'Work Sans', sans-serif;
+    font-weight:600;
+    font-size:1rem;
+    cursor:pointer;
+  }
+  .order-send-btn:hover{background:var(--curtain-dark);}
+  .order-clear-link{
+    display:block;
+    text-align:center;
+    margin-top:.9rem;
+    font-family:'Space Mono', monospace;
+    font-size:.75rem;
+    color:var(--curtain-dark);
+    opacity:.6;
+    text-decoration:underline;
+    cursor:pointer;
+    background:none;
+    border:none;
+  }
+
   footer{
     text-align:center;
     padding:2rem 1rem 3rem;
@@ -403,7 +572,7 @@
     <input id="searchInput" type="text" placeholder="Search by category, name, colour, size, description, or keyword" autocomplete="off">
   </div>
   <div class="filter-row" id="filterRow">
-    <!-- category chips injected here -->
+    <!-- category dropdown injected here -->
     <span class="count-readout" id="countReadout"></span>
   </div>
 </div>
@@ -433,6 +602,30 @@
   </div>
 </div>
 
+<button class="order-fab" id="orderFab">
+  <span>🧺 Order</span>
+  <span class="count-badge" id="orderCount">0</span>
+</button>
+
+<div class="modal-backdrop" id="orderBackdrop">
+  <div class="order-panel">
+    <button class="modal-close" id="orderClose">✕</button>
+    <h2>Your Order</h2>
+    <ul class="order-list" id="orderList"></ul>
+    <div class="order-total" id="orderTotal"></div>
+    <div class="order-form">
+      <label for="orderName">Your name *</label>
+      <input type="text" id="orderName" placeholder="Jane Smith">
+      <label for="orderContact">Phone or email *</label>
+      <input type="text" id="orderContact" placeholder="083 000 0000 or jane@email.com">
+      <label for="orderNotes">Dates needed / notes</label>
+      <textarea id="orderNotes" placeholder="e.g. Needed for fitting 12–14 Sept"></textarea>
+    </div>
+    <button class="order-send-btn" id="orderSendBtn">Send Order Request</button>
+    <button class="order-clear-link" id="orderClearBtn">Clear order</button>
+  </div>
+</div>
+
 <script>
 /* =========================================================================
    DEMO DATA
@@ -440,23 +633,22 @@
    above is left blank, so the page has something to show out of the box.
    ========================================================================= */
 const DEMO_DATA = [
-  {id:"HA001", category:"Headgear", name:"Red Peak Cap", photo:"", size:"Small", color:"Red", era:"Modern / Military", location:"Hat Shelf", notes:"Red cap with clover insignia", status:"Available"},
-  {id:"HA002", category:"Headgear", name:"Red Peak Cap", photo:"", size:"Small", color:"Red", era:"Modern / Military", location:"Hat Shelf", notes:"Red cap with clover insignia", status:"Available"},
-  {id:"HA003", category:"Headgear", name:"Brown Peak Cap", photo:"", size:"Small", color:"Brown", era:"Modern / Military", location:"Hat Shelf", notes:"German military cap with eagle badge and strap", status:"Available"},
-  {id:"HA004", category:"Headgear", name:"Brown Peak Cap", photo:"", size:"Medium", color:"Brown", era:"Modern / Military", location:"Hat Shelf", notes:"Police hat with blue band", status:"Available"},
-  {id:"HA005", category:"Headgear", name:"Driver Hat", photo:"", size:"Small", color:"Black", era:"Modern / Military", location:"Hat Shelf", notes:"Driver hat with blue band", status:"Available"},
-  {id:"HA006", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Black", era:"Modern / Military", location:"Hat Shelf", notes:"Black driver cap", status:"Available"},
-  {id:"HA007", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Grey", era:"Modern / Military", location:"Hat Shelf", notes:"Grey flat driver cap", status:"Unavailable"},
-  {id:"HA008", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Black", era:"Modern / Military", location:"Hat Shelf", notes:"Black driver cap", status:"Available"},
-  {id:"HA009", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Black", era:"Modern / Military", location:"Hat Shelf", notes:"Black driver cap with red stripe", status:"Available"},
-  {id:"HA010", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Blue", era:"Modern / Military", location:"Hat Shelf", notes:"Faded blue driver cap", status:"Available"}
+  {id:"HA001", category:"Headgear", name:"Red Peak Cap", photo:"", size:"Small", color:"Red", era:"Modern / Military", location:"Hat Shelf", notes:"Red cap with clover insignia", status:"Available", price:"R15.00"},
+  {id:"HA002", category:"Headgear", name:"Red Peak Cap", photo:"", size:"Small", color:"Red", era:"Modern / Military", location:"Hat Shelf", notes:"Red cap with clover insignia", status:"Available", price:"R15.00"},
+  {id:"HA003", category:"Headgear", name:"Brown Peak Cap", photo:"", size:"Small", color:"Brown", era:"Modern / Military", location:"Hat Shelf", notes:"German military cap with eagle badge and strap", status:"Available", price:"R18.00"},
+  {id:"HA004", category:"Headgear", name:"Brown Peak Cap", photo:"", size:"Medium", color:"Brown", era:"Modern / Military", location:"Hat Shelf", notes:"Police hat with blue band", status:"Available", price:"R18.00"},
+  {id:"HA005", category:"Headgear", name:"Driver Hat", photo:"", size:"Small", color:"Black", era:"Modern / Military", location:"Hat Shelf", notes:"Driver hat with blue band", status:"Available", price:"R20.00"},
+  {id:"HA006", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Black", era:"Modern / Military", location:"Hat Shelf", notes:"Black driver cap", status:"Available", price:"R12.00"},
+  {id:"HA007", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Grey", era:"Modern / Military", location:"Hat Shelf", notes:"Grey flat driver cap", status:"Unavailable", price:"R12.00"},
+  {id:"HA008", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Black", era:"Modern / Military", location:"Hat Shelf", notes:"Black driver cap", status:"Available", price:"R12.00"},
+  {id:"HA009", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Black", era:"Modern / Military", location:"Hat Shelf", notes:"Black driver cap with red stripe", status:"Available", price:"R12.00"},
+  {id:"HA010", category:"Headgear", name:"Driver Cap", photo:"", size:"Small", color:"Blue", era:"Modern / Military", location:"Hat Shelf", notes:"Faded blue driver cap", status:"Available", price:"R12.00"}
 ];
 
 const CONFIG = window.CATALOGUE_CONFIG || {SHEET_ID:"", SHEET_NAME:"Costume Catalogue"};
 
 let ALL_ITEMS = [];
 let activeCategory = "All";
-let activeStatus = "All";
 
 /* ---------- Google Sheet loading ---------- */
 // Each field accepts a few possible header spellings, so renaming a column
@@ -472,7 +664,8 @@ const FIELD_HEADER_ALIASES = {
   era:      ["era"],
   location: ["location"],
   notes:    ["notes", "description"],
-  status:   ["status"]
+  status:   ["status"],
+  price:    ["price", "daily rate", "rate"]
 };
 
 async function loadFromSheet(){
@@ -514,7 +707,7 @@ async function loadFromSheet(){
       id: v(colIndex.id), category: v(colIndex.category), name: v(colIndex.name),
       photo: v(colIndex.photo), size: v(colIndex.size), color: v(colIndex.color),
       era: v(colIndex.era), location: v(colIndex.location), notes: v(colIndex.notes),
-      status: v(colIndex.status) || "Available", extra
+      status: v(colIndex.status) || "Available", price: v(colIndex.price), extra
     };
   }).filter(item => item.id);
 }
@@ -550,34 +743,23 @@ function resolveImageUrl(photo, size){
 function categoriesFrom(items){
   return ["All", ...new Set(items.map(i => i.category).filter(Boolean))];
 }
-function statusesFrom(items){
-  return ["All", ...new Set(items.map(i => i.status).filter(Boolean))];
-}
 
 function buildFilters(){
   const row = document.getElementById('filterRow');
   row.innerHTML = "";
-  const cats = categoriesFrom(ALL_ITEMS);
-  cats.forEach(cat => {
-    const chip = document.createElement('button');
-    chip.className = 'chip' + (cat === activeCategory ? ' active' : '');
-    chip.textContent = cat;
-    chip.onclick = () => { activeCategory = cat; render(); };
-    row.appendChild(chip);
-  });
 
-  const sep = document.createElement('span');
-  sep.className = 'filter-sep';
-  row.appendChild(sep);
-
-  const statuses = statusesFrom(ALL_ITEMS);
-  statuses.forEach(st => {
-    const chip = document.createElement('button');
-    chip.className = 'chip' + (st === activeStatus ? ' active' : '');
-    chip.textContent = st;
-    chip.onclick = () => { activeStatus = st; render(); };
-    row.appendChild(chip);
+  const select = document.createElement('select');
+  select.className = 'category-select';
+  select.id = 'categorySelect';
+  categoriesFrom(ALL_ITEMS).forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat === "All" ? "All categories" : cat;
+    if(cat === activeCategory) opt.selected = true;
+    select.appendChild(opt);
   });
+  select.onchange = () => { activeCategory = select.value; render(); };
+  row.appendChild(select);
 
   const count = document.createElement('span');
   count.className = 'count-readout';
@@ -596,7 +778,6 @@ function render(){
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const filtered = ALL_ITEMS.filter(item =>
     (activeCategory === "All" || item.category === activeCategory) &&
-    (activeStatus === "All" || item.status === activeStatus) &&
     matchesSearch(item, q)
   );
 
@@ -626,21 +807,145 @@ function render(){
                  : `<div class="placeholder-swatch">${initial}</div>`}
       </div>
       <div class="card-body">
-        <div class="card-cat">${escapeHtml(item.category || '—')}</div>
         <div class="card-name">${escapeHtml(item.name || 'Untitled item')}</div>
         <div class="card-meta">
           ${item.size ? `<span class="pill">${escapeHtml(item.size)}</span>` : ''}
-          ${item.color ? `<span class="pill">${escapeHtml(item.color)}</span>` : ''}
         </div>
         <div class="card-foot">
           <span class="stub-id">${escapeHtml(item.id)}</span>
-          <span class="status-dot ${/avail/i.test(item.status) ? '' : 'unavailable'}">${escapeHtml(item.status || '')}</span>
+          <div class="card-foot-right">
+            ${item.price ? `<span class="card-price">${escapeHtml(formatPrice(item.price))}</span>` : ''}
+            <span class="status-dot ${/avail/i.test(item.status) ? '' : 'unavailable'}">${escapeHtml(item.status || '')}</span>
+          </div>
         </div>
       </div>
     `;
     card.onclick = () => openModal(item);
     grid.appendChild(card);
   });
+}
+
+/* ---------- Order (email request) ---------- */
+let ORDER_ITEMS = {};
+
+function loadOrder(){
+  try{
+    ORDER_ITEMS = JSON.parse(sessionStorage.getItem('wardrobeOrder') || '{}');
+  }catch(e){
+    ORDER_ITEMS = {};
+  }
+}
+
+function saveOrder(){
+  try{ sessionStorage.setItem('wardrobeOrder', JSON.stringify(ORDER_ITEMS)); }catch(e){}
+  updateOrderFab();
+}
+
+function toggleOrderItem(item){
+  if(item.id in ORDER_ITEMS){
+    delete ORDER_ITEMS[item.id];
+  }else{
+    ORDER_ITEMS[item.id] = {id:item.id, name:item.name, price:item.price || ''};
+  }
+  saveOrder();
+}
+
+function updateOrderFab(){
+  const fab = document.getElementById('orderFab');
+  const count = Object.keys(ORDER_ITEMS).length;
+  fab.classList.toggle('visible', count > 0);
+  document.getElementById('orderCount').textContent = count;
+}
+
+function renderOrderPanel(){
+  const list = document.getElementById('orderList');
+  const items = Object.values(ORDER_ITEMS);
+
+  if(items.length === 0){
+    list.innerHTML = `<div class="order-empty">Your order is empty. Browse the wardrobe and tap "Add to order" on anything you need.</div>`;
+    document.getElementById('orderTotal').textContent = '';
+    return;
+  }
+
+  list.innerHTML = items.map(it => `
+    <li class="order-list-item">
+      <div class="oli-info">
+        <div class="oli-name">${escapeHtml(it.name || 'Untitled item')}</div>
+        <div class="oli-meta">${escapeHtml(it.id)}${it.price ? ' · ' + escapeHtml(formatPrice(it.price)) : ''}</div>
+      </div>
+      <button class="order-remove-btn" data-id="${escapeHtml(it.id)}" title="Remove">✕</button>
+    </li>
+  `).join('');
+
+  list.querySelectorAll('.order-remove-btn').forEach(btn => {
+    btn.onclick = () => {
+      delete ORDER_ITEMS[btn.dataset.id];
+      saveOrder();
+      renderOrderPanel();
+    };
+  });
+
+  const total = items.reduce((sum, it) => {
+    const n = parseFloat(String(it.price || '').replace(/[^0-9.]/g, ''));
+    return isNaN(n) ? sum : sum + n;
+  }, 0);
+  document.getElementById('orderTotal').textContent = total > 0 ? `Estimated total: R${total.toFixed(2)} / day` : '';
+}
+
+function sendOrder(){
+  const items = Object.values(ORDER_ITEMS);
+  if(items.length === 0){
+    alert('Your order is empty — add a few items first.');
+    return;
+  }
+  const name = document.getElementById('orderName').value.trim();
+  const contact = document.getElementById('orderContact').value.trim();
+  const notes = document.getElementById('orderNotes').value.trim();
+  if(!name || !contact){
+    alert('Please add your name and a phone number or email so we can get back to you.');
+    return;
+  }
+  if(!CONFIG.CONTACT_EMAIL){
+    alert('CONTACT_EMAIL is not set up yet — add it to the CATALOGUE_CONFIG block near the top of this file.');
+    return;
+  }
+  const lines = items
+    .map(it => `• ${it.name || 'Untitled item'} (${it.id})${it.price ? ' – ' + formatPrice(it.price) : ''}`)
+    .join('\n');
+  const subject = `Wardrobe order request — ${name}`;
+  const body =
+`Name: ${name}
+Phone/Email: ${contact}
+
+Items requested:
+${lines}
+
+Notes:
+${notes || '—'}`;
+  window.location.href = `mailto:${CONFIG.CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+document.getElementById('orderFab').onclick = () => {
+  renderOrderPanel();
+  document.getElementById('orderBackdrop').classList.add('open');
+};
+document.getElementById('orderClose').onclick = () => document.getElementById('orderBackdrop').classList.remove('open');
+document.getElementById('orderBackdrop').onclick = (e) => { if(e.target.id === 'orderBackdrop') e.currentTarget.classList.remove('open'); };
+document.getElementById('orderClearBtn').onclick = () => {
+  if(Object.keys(ORDER_ITEMS).length === 0) return;
+  if(confirm('Clear your whole order list?')){
+    ORDER_ITEMS = {};
+    saveOrder();
+    renderOrderPanel();
+  }
+};
+document.getElementById('orderSendBtn').onclick = sendOrder;
+
+function formatPrice(price){
+  if(!price) return '';
+  // Sheet just holds an amount like "R15.00" — this appends the "/ day" label
+  // so you don't have to type it into every row yourself.
+  return /day/i.test(price) ? price : `${price} / day`;
 }
 
 function escapeHtml(str){
@@ -693,9 +998,14 @@ function openModal(item){
     ? `<a href="${item.photo}" target="_blank" rel="noopener" class="full-image-link">Open original photo in Drive ↗</a>`
     : '';
 
+  const inOrder = item.id in ORDER_ITEMS;
   document.getElementById('modalBody').innerHTML = `
     <div class="modal-cat">${escapeHtml(item.category || '—')}</div>
     <div class="modal-name">${escapeHtml(item.name || 'Untitled item')}</div>
+    ${item.price ? `<div class="modal-price">${escapeHtml(formatPrice(item.price))}</div>` : ''}
+    <button class="order-toggle-btn ${inOrder ? 'in-order' : ''}" id="orderToggleBtn">
+      ${inOrder ? '✓ Added to order' : '+ Add to order'}
+    </button>
     <div class="modal-grid">
       ${buildModalFields(item)}
     </div>
@@ -703,6 +1013,14 @@ function openModal(item){
     ${fullLink}
   `;
   backdrop.classList.add('open');
+
+  document.getElementById('orderToggleBtn').onclick = () => {
+    toggleOrderItem(item);
+    const btn = document.getElementById('orderToggleBtn');
+    const nowInOrder = item.id in ORDER_ITEMS;
+    btn.classList.toggle('in-order', nowInOrder);
+    btn.textContent = nowInOrder ? '✓ Added to order' : '+ Add to order';
+  };
 }
 document.getElementById('modalClose').onclick = () => document.getElementById('modalBackdrop').classList.remove('open');
 document.getElementById('modalBackdrop').onclick = (e) => { if(e.target.id === 'modalBackdrop') e.currentTarget.classList.remove('open'); };
@@ -711,6 +1029,8 @@ document.getElementById('searchInput').addEventListener('input', render);
 
 /* ---------- Boot ---------- */
 async function boot(){
+  loadOrder();
+  updateOrderFab();
   if(CONFIG.SHEET_ID){
     try{
       ALL_ITEMS = await loadFromSheet();
