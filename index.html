@@ -19,7 +19,7 @@
     // The exact name of the tab, as shown at the bottom of the sheet
     SHEET_NAME: "Wardrobe Catalogue",
     // Where order request emails should be sent (opens the visitor's own email app)
-    CONTACT_EMAIL: "testthis@gmail.com",
+    CONTACT_EMAIL: "garthcoulson@gmail.com",
     // Shown in the footer and as a fallback if a visitor's email app doesn't open
     CONTACT_PHONE: "021 877 9869"
   };
@@ -458,18 +458,41 @@
     border-top:1px solid rgba(42,36,32,.1);
   }
   .order-list-item{
-    display:flex; justify-content:space-between; align-items:center;
-    gap:.8rem;
+    display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center;
+    gap:.5rem .8rem;
     padding:.7rem 0;
     border-bottom:1px solid rgba(42,36,32,.1);
   }
-  .order-list-item .oli-info{flex:1; min-width:0;}
+  .order-list-item .oli-info{flex:1 1 140px; min-width:0;}
   .order-list-item .oli-name{font-weight:600; font-size:.92rem;}
   .order-list-item .oli-meta{
     font-family:'Space Mono', monospace;
     font-size:.72rem;
     color:var(--curtain-dark);
     opacity:.75;
+  }
+  .oli-days-wrap{
+    display:flex; align-items:center; gap:.4rem;
+    flex-shrink:0;
+  }
+  .oli-days-wrap label{
+    font-family:'Space Mono', monospace;
+    font-size:.65rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--curtain-dark);
+    opacity:.7;
+  }
+  .oli-days{
+    width:3.2rem;
+    text-align:center;
+    font-family:'Space Mono', monospace;
+    font-size:.85rem;
+    padding:.3rem .2rem;
+    border:1px solid rgba(42,36,32,.25);
+    border-radius:6px;
+    background:var(--paper);
+    color:var(--ink);
   }
   .order-remove-btn{
     background:transparent;
@@ -623,7 +646,7 @@
 </main>
 
 <footer>
-  Wardrobe Catalogue — built for the company, kept in Google Sheets
+  The Masque Theatre Wardrobe Catalogue
   <div class="footer-contact" id="footerContact"></div>
 </footer>
 
@@ -907,7 +930,7 @@ function toggleOrderItem(item){
   if(item.id in ORDER_ITEMS){
     delete ORDER_ITEMS[item.id];
   }else{
-    ORDER_ITEMS[item.id] = {id:item.id, name:item.name, price:item.price || ''};
+    ORDER_ITEMS[item.id] = {id:item.id, name:item.name, price:item.price || '', days:1};
   }
   saveOrder();
 }
@@ -917,6 +940,27 @@ function updateOrderFab(){
   const count = Object.keys(ORDER_ITEMS).length;
   fab.classList.toggle('visible', count > 0);
   document.getElementById('orderCount').textContent = count;
+}
+
+function itemSubtotal(it){
+  const n = parseFloat(String(it.price || '').replace(/[^0-9.]/g, ''));
+  if(isNaN(n)) return null;
+  return n * (it.days || 1);
+}
+
+function computeOrderTotal(){
+  const items = Object.values(ORDER_ITEMS);
+  let total = 0, anyPriced = false;
+  items.forEach(it => {
+    const sub = itemSubtotal(it);
+    if(sub !== null){ anyPriced = true; total += sub; }
+  });
+  return {total, anyPriced};
+}
+
+function updateOrderTotalDisplay(){
+  const {total, anyPriced} = computeOrderTotal();
+  document.getElementById('orderTotal').textContent = anyPriced ? `Estimated total: R${total.toFixed(2)}` : '';
 }
 
 function renderOrderPanel(){
@@ -935,6 +979,10 @@ function renderOrderPanel(){
         <div class="oli-name">${escapeHtml(it.name || 'Untitled item')}</div>
         <div class="oli-meta">${escapeHtml(it.id)}${it.price ? ' · ' + escapeHtml(formatPrice(it.price)) : ''}</div>
       </div>
+      <div class="oli-days-wrap">
+        <label for="days-${escapeHtml(it.id)}">Days</label>
+        <input type="number" min="1" step="1" class="oli-days" id="days-${escapeHtml(it.id)}" data-id="${escapeHtml(it.id)}" value="${it.days || 1}">
+      </div>
       <button class="order-remove-btn" data-id="${escapeHtml(it.id)}" title="Remove">✕</button>
     </li>
   `).join('');
@@ -947,11 +995,18 @@ function renderOrderPanel(){
     };
   });
 
-  const total = items.reduce((sum, it) => {
-    const n = parseFloat(String(it.price || '').replace(/[^0-9.]/g, ''));
-    return isNaN(n) ? sum : sum + n;
-  }, 0);
-  document.getElementById('orderTotal').textContent = total > 0 ? `Estimated total: R${total.toFixed(2)} / day` : '';
+  list.querySelectorAll('.oli-days').forEach(inp => {
+    inp.oninput = () => {
+      let days = parseInt(inp.value, 10);
+      if(isNaN(days) || days < 1) days = 1;
+      const it = ORDER_ITEMS[inp.dataset.id];
+      if(it){ it.days = days; }
+      saveOrder();
+      updateOrderTotalDisplay();
+    };
+  });
+
+  updateOrderTotalDisplay();
 }
 
 function sendOrder(){
@@ -972,15 +1027,25 @@ function sendOrder(){
     return;
   }
   const lines = items
-    .map(it => `• ${it.name || 'Untitled item'} (${it.id})${it.price ? ' – ' + formatPrice(it.price) : ''}`)
+    .map(it => {
+      const days = it.days || 1;
+      const daysText = `${days} day${days > 1 ? 's' : ''}`;
+      const sub = itemSubtotal(it);
+      const priceText = it.price
+        ? (sub !== null ? ` — ${formatPrice(it.price)} × ${daysText} = R${sub.toFixed(2)}` : ` — ${formatPrice(it.price)}`)
+        : '';
+      return `• ${it.name || 'Untitled item'} (${it.id}) — ${daysText}${priceText}`;
+    })
     .join('\n');
+  const {total, anyPriced} = computeOrderTotal();
   const subject = `Wardrobe order request — ${name}`;
+  const totalLine = anyPriced ? `\n\nEstimated total: R${total.toFixed(2)}` : '';
   const body =
 `Name: ${name}
 Phone/Email: ${contact}
 
 Items requested:
-${lines}
+${lines}${totalLine}
 
 Notes:
 ${notes || '—'}`;
